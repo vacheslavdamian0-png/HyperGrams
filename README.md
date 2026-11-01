@@ -1,6 +1,6 @@
 # HyperGram
 
-HyperGram is an independent messaging application project based on the OwpenGram codebase.
+HyperGram is an independent messaging application project being prepared from the OwpenGram codebase.
 
 ## Project ownership
 
@@ -15,14 +15,16 @@ HyperGram is an independent messaging application project based on the OwpenGram
 
 ## Project status
 
-This repository is the initial project home for HyperGram. Product branding, Android client changes, server deployment, and infrastructure are still being prepared.
+The repository contains project documentation and a local-first development plan. The upstream Android application source has not yet been imported, a HyperGram APK has not been built, and a working HyperGram messaging backend has not yet been completed.
+
+The initial development target is a same-device local prototype on Android using Termux, Python, and SQLite. PostgreSQL and Docker are not assumed to work inside the current Android/PRoot environment. A service bound to 127.0.0.1 is accessible only on that same device; it is not a public server.
 
 HyperGram is an independent project and is not an official Telegram application or service.
 
 ## Licensing
 
-The upstream Android client is licensed under GPL-2.0-or-later and the upstream server under Apache-2.0. Before redistributing modified upstream components, retain required copyright and license notices and comply with the applicable licenses. Add the relevant license files and notices for each component as the source code is brought into this repository.
+The upstream Android client is licensed under GPL-2.0-or-later and the upstream server under Apache-2.0. Preserve required copyright and license notices and comply with the applicable licenses when importing, modifying, or distributing upstream components.
 
 ## Security
 
-Do not commit passwords, API keys, private signing keys, database credentials, or other secrets.
+Never commit passwords, API keys, Telegram bot tokens, private signing keys, database credentials, or other secrets. Local environment files and signing artifacts are excluded by .gitignore.
