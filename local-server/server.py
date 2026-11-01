@@ -101,7 +101,7 @@ def bot_loop():
                             "INSERT OR IGNORE INTO telegram_users(chat_id, first_seen) VALUES(?, ?)",
                             (chat_id, int(time.time())),
                         )
-                    send_message(chat_id, "HyperGram: этот Telegram-аккаунт подключён для получения кодов входа. Запросить код можно в локальном приложении.")
+                    send_message(chat_id, "HyperGram: Telegram подключён. Ваш chat_id: {chat_id}. Сохраните его для локального теста. Никому не сообщайте коды входа.")
                 elif text.startswith("/help"):
                     send_message(chat_id, "Это бот подтверждения входа HyperGram. Никому не пересылайте коды.")
         except Exception as exc:
