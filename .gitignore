@@ -1,0 +1,25 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+*.token
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
