@@ -10,10 +10,10 @@ import secrets
 import sqlite3
 import threading
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from contextlib import contextmanager
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HYPERGRAM_DB", os.path.join(ROOT, "hypergram.sqlite3"))
@@ -23,13 +23,18 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CODE_TTL = 300
 RESEND_SECONDS = 60
 MAX_ATTEMPTS = 5
-_sessions_lock = threading.Lock()
-
-
+@contextmanager
 def db():
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db():
