@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17212b">
+<title>HyperGram</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#0e1621;color:#f2f4f5}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0e1621}
+header{padding:18px 16px;background:#17212b;border-bottom:1px solid #263442}
+h1{font-size:22px;margin:0}header p{margin:5px 0 0;color:#9eacb8;font-size:13px}
+main{max-width:680px;margin:auto;padding:16px}
+.panel{background:#17212b;border:1px solid #263442;border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 12px}
+label{display:block;font-size:13px;color:#b7c5d0;margin:10px 0 5px}
+input,textarea,button{width:100%;font:inherit;border-radius:10px;padding:12px;border:1px solid #344657;background:#0e1621;color:#f2f4f5}
+textarea{resize:vertical;min-height:70px}button{background:#2879c7;border:0;font-weight:600;margin-top:10px;cursor:pointer}button.secondary{background:#26394a}
+button:disabled{opacity:.5}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+#status{font-size:13px;color:#9eacb8;white-space:pre-wrap;margin-top:10px}
+#messages{display:flex;flex-direction:column;gap:8px;min-height:100px;max-height:48vh;overflow:auto}
+.msg{padding:10px 12px;border-radius:12px;background:#263442;max-width:88%;overflow-wrap:anywhere}
+.msg.mine{align-self:flex-end;background:#245b83}
+.msg small{display:block;color:#c3d1dc;font-size:11px;margin-bottom:4px}
+.hint{font-size:12px;color:#9eacb8;line-height:1.5}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header><h1>HyperGram</h1><p>Локальный прототип мессенджера</p></header>
+<main>
+<section class="panel" id="login">
+<h2>Вход через Telegram</h2>
+<p class="hint">Сначала открой своего Telegram-бота и отправь /start. Затем введи полученный chat_id.</p>
+<label for="chat">Твой Telegram chat_id</label><input id="chat" inputmode="numeric" autocomplete="off" placeholder="Например, 123456789">
+<div class="row"><button id="request">Получить код</button></div>
+<label for="code">Код из Telegram</label><input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 цифр">
+<button id="verify">Войти</button>
+</section>
+<section class="panel hidden" id="chatPanel">
+<h2>Личные сообщения</h2>
+<label for="peer">chat_id собеседника</label><input id="peer" inputmode="numeric" placeholder="chat_id получателя">
+<button class="secondary" id="load">Загрузить переписку</button>
+<div id="messages" aria-live="polite"></div>
+<label for="body">Сообщение</label><textarea id="body" maxlength="4000" placeholder="Напиши сообщение..."></textarea>
+<button id="send">Отправить</button>
+<button class="secondary" id="logout">Выйти</button>
+</section>
+<p class="hint">Это тестовая версия: сообщения сохраняются в локальной базе на этом телефоне. Пока нет сквозного шифрования, push-уведомлений и связи с официальным Telegram.</p>
+<div id="status" role="status"></div>
+</main>
+<script>
+let token = "";
+const $ = id => document.getElementById(id);
+function status(message){$("status").textContent=message}
+async function api(path, data, method="POST"){
+  const headers={"Content-Type":"application/json"};
+  if(token) headers.Authorization="Bearer "+token;
+  const response=await fetch(path,{method,headers,body:data?JSON.stringify(data):undefined});
+  const result=await response.json().catch(()=>({error:"invalid_server_response"}));
+  if(!response.ok) throw new Error(result.error||("HTTP "+response.status));
+  return result;
+}
+$("request").onclick=async()=>{
+  const chat_id=$("chat").value.trim();
+  try{await api("/request-code",{chat_id});status("Код отправлен в Telegram. Он действует 5 минут.");}
+  catch(e){status("Не удалось получить код: "+e.message);}
+};
+$("verify").onclick=async()=>{
+  try{
+    const result=await api("/verify-code",{chat_id:$("chat").value.trim(),code:$("code").value.trim()});
+    token=result.session_token;
+    $("login").classList.add("hidden");$("chatPanel").classList.remove("hidden");
+    status("Вход выполнен. Токен хранится только в памяти этой вкладки.");
+  }catch(e){status("Не удалось войти: "+e.message);}
+};
+$("load").onclick=loadMessages;
+async function loadMessages(){
+  const peer=$("peer").value.trim();
+  try{
+    const result=await api("/messages?with="+encodeURIComponent(peer),null,"GET");
+    const box=$("messages");box.replaceChildren();
+    for(const item of result.messages){
+      const el=document.createElement("div");el.className="msg"+(item.sender_id===$("chat").value.trim()?" mine":"");
+      const meta=document.createElement("small");meta.textContent=(item.sender_id===$("chat").value.trim()?"Вы":"Собеседник")+" · "+new Date(item.created_at*1000).toLocaleString();
+      const body=document.createElement("div");body.textContent=item.body;
+      el.append(meta,body);box.append(el);
+    }
+    box.scrollTop=box.scrollHeight;
+    status("Загружено сообщений: "+result.messages.length);
+  }catch(e){status("Не удалось загрузить: "+e.message);}
+}
+$("send").onclick=async()=>{
+  try{
+    await api("/send-message",{to:$("peer").value.trim(),text:$("body").value});
+    $("body").value="";await loadMessages();
+  }catch(e){status("Не удалось отправить: "+e.message);}
+};
+$("logout").onclick=()=>{token="";$("chatPanel").classList.add("hidden");$("login").classList.remove("hidden");$("messages").replaceChildren();status("Вы вышли. Для нового входа запроси код.");};
+</script>
+</body>
+</html>
