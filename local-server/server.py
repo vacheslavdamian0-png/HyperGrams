@@ -57,6 +57,14 @@ def init_db():
             created_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id TEXT NOT NULL,
+            recipient_id TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_id, recipient_id, id);
         """)
 
 
@@ -111,7 +119,7 @@ def bot_loop():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HyperGramLocal/0.1"
+    server_version = "HyperGramLocal/0.2"
 
     def log_message(self, fmt, *args):
         print("HTTP", self.address_string(), fmt % args, flush=True)
@@ -135,15 +143,74 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             return None
 
+    def authenticated_chat_id(self):
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Bearer "):
+            return None
+        token = header[7:].strip()
+        if len(token) < 32:
+            return None
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        now = int(time.time())
+        with db() as c:
+            row = c.execute(
+                "SELECT chat_id FROM sessions WHERE token_hash=? AND expires_at>?",
+                (digest, now),
+            ).fetchone()
+        return row["chat_id"] if row else None
+
     def do_GET(self):
         if self.path == "/health":
             return self.reply(200, {"ok": True, "service": "HyperGram local prototype"})
+        if self.path.startswith("/messages"):
+            owner = self.authenticated_chat_id()
+            if not owner:
+                return self.reply(401, {"error": "authentication_required"})
+            params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            peer = (params.get("with") or [""])[0]
+            if not peer.isdigit() or len(peer) > 20:
+                return self.reply(400, {"error": "invalid_recipient"})
+            with db() as c:
+                rows = c.execute(
+                    """SELECT id, sender_id, recipient_id, body, created_at
+                       FROM messages
+                       WHERE (sender_id=? AND recipient_id=?)
+                          OR (sender_id=? AND recipient_id=?)
+                       ORDER BY id DESC LIMIT 100""",
+                    (owner, peer, peer, owner),
+                ).fetchall()
+            return self.reply(200, {"messages": [dict(row) for row in reversed(rows)]})
         return self.reply(404, {"error": "not_found"})
 
     def do_POST(self):
         data = self.read_json()
         if data is None:
             return self.reply(400, {"error": "invalid_json"})
+
+        if self.path == "/send-message":
+            sender = self.authenticated_chat_id()
+            if not sender:
+                return self.reply(401, {"error": "authentication_required"})
+            recipient = str(data.get("to", "")).strip()
+            body = str(data.get("text", "")).strip()
+            if not recipient.isdigit() or len(recipient) > 20 or not body or len(body) > 4000:
+                return self.reply(400, {"error": "invalid_message"})
+            if recipient == sender:
+                return self.reply(400, {"error": "cannot_message_yourself"})
+            now = int(time.time())
+            with db() as c:
+                registered = c.execute(
+                    "SELECT chat_id FROM telegram_users WHERE chat_id=?",
+                    (recipient,),
+                ).fetchone()
+                if not registered:
+                    return self.reply(404, {"error": "recipient_not_registered"})
+                cur = c.execute(
+                    "INSERT INTO messages(sender_id, recipient_id, body, created_at) VALUES(?,?,?,?)",
+                    (sender, recipient, body, now),
+                )
+                message_id = cur.lastrowid
+            return self.reply(201, {"ok": True, "message_id": message_id, "created_at": now})
 
         if self.path == "/request-code":
             chat_id = str(data.get("chat_id", "")).strip()
