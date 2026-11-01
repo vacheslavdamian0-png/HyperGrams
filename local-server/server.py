@@ -160,6 +160,20 @@ class Handler(BaseHTTPRequestHandler):
         return row["chat_id"] if row else None
 
     def do_GET(self):
+        if self.path in ("/", "/index.html"):
+            page_path = os.path.join(ROOT, "index.html")
+            try:
+                with open(page_path, "rb") as page:
+                    raw = page.read()
+            except OSError:
+                return self.reply(404, {"error": "web_client_not_installed"})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(raw)
+            return
         if self.path == "/health":
             return self.reply(200, {"ok": True, "service": "HyperGram local prototype"})
         if self.path.startswith("/messages"):
