@@ -21,7 +21,7 @@ If you already cloned the repository, use `cd` to enter its `local-server` direc
 python server.py
 ```
 
-In another Termux session, check the local API:
+Open the mobile web interface in your phone browser at `http://127.0.0.1:8787/`. The page is served by the local API. In another Termux session, you can also check the API:
 
 ```sh
 curl http://127.0.0.1:8787/health
@@ -54,7 +54,7 @@ Keep the shell session private. For a more persistent setup, store the token in 
 - `POST /request-code` with JSON `{"chat_id":"YOUR_TELEGRAM_CHAT_ID"}` — sends a six-digit code; code expires in 5 minutes, resend cooldown is 60 seconds.
 - `POST /verify-code` with JSON `{"chat_id":"YOUR_TELEGRAM_CHAT_ID","code":"123456"}` — consumes the code and returns a random session token.
 
-The Telegram chat ID is visible in the bot's local SQLite registration, but this prototype does not yet include a polished client UI or an endpoint to display the ID. The next development step is to add a safe local account/status flow and then connect an Android client.
+The Telegram chat ID is sent to you by the bot after `/start`. Enter it in the local web page to request a one-time login code.
 
 ## Limits and safety
 
@@ -82,4 +82,4 @@ curl 'http://127.0.0.1:8787/messages?with=RECIPIENT_CHAT_ID' \
   -H 'Authorization: Bearer YOUR_SESSION_TOKEN'
 ```
 
-Both users must have pressed Start in the bot. The recipient must also have completed login before they can send messages. Messages are stored locally in SQLite; this prototype does not yet provide end-to-end encryption, delivery notifications, attachments, or a graphical chat interface. Treat session tokens as passwords.
+Both users must have pressed Start in the bot so their chat IDs are registered. The recipient does not yet need to have logged in. Messages are stored locally in SQLite; this prototype does not yet provide end-to-end encryption, delivery notifications, attachments, or a native Android interface. Treat session tokens as passwords.
